@@ -450,7 +450,7 @@
     }
 
     showcase.innerHTML =
-      '<span class="login-route-kicker">Smart scheduling</span>' +
+      '<span class="login-route-kicker">Doc App - Not only for doctors but for everyone</span>' +
       "<h2>Appointments made easy for doctors and patients.</h2>" +
       "<p>Manage bookings, track schedules, and stay on top of healthcare updates from one simple appointment platform built for both doctors and users.</p>" +
       '<div class="login-route-points">' +
