@@ -1,0 +1,260 @@
+/* Docapp theme — loaded after main bundle CSS */
+
+:root {
+  --doc-bg: #f0f9ff;
+  --doc-bg-2: #ecfeff;
+  --doc-sidebar: linear-gradient(165deg, #0d9488 0%, #0f766e 45%, #134e4a 100%);
+  --doc-card: #ffffff;
+  --doc-text: #0f172a;
+  --doc-muted: #64748b;
+  --doc-accent: #0d9488;
+  --doc-radius: 14px;
+  --doc-shadow: 0 10px 40px -12px rgba(15, 23, 42, 0.12);
+  --doc-shadow-lg: 0 25px 50px -12px rgba(15, 23, 42, 0.18);
+}
+
+html {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  font-family: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, Helvetica,
+    Arial, sans-serif;
+  color: var(--doc-text);
+  background: radial-gradient(
+      ellipse 120% 80% at 100% -20%,
+      rgba(45, 212, 191, 0.12),
+      transparent 50%
+    ),
+    radial-gradient(
+      ellipse 80% 60% at 0% 100%,
+      rgba(56, 189, 248, 0.1),
+      transparent 45%
+    ),
+    linear-gradient(180deg, var(--doc-bg) 0%, var(--doc-bg-2) 100%);
+  min-height: 100vh;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+/* Layout shell */
+.main {
+  padding: 16px !important;
+  box-sizing: border-box;
+}
+
+.layout {
+  gap: 20px;
+  align-items: stretch;
+}
+
+/* Sidebar */
+.sidebar {
+  background: var(--doc-sidebar) !important;
+  border-radius: var(--doc-radius) !important;
+  box-shadow: var(--doc-shadow-lg) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  width: min(300px, 92vw) !important;
+  margin-right: 20px !important;
+  padding-bottom: 24px !important;
+}
+
+.logo h6 {
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  padding: 8px 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+  margin: 12px 0 8px !important;
+}
+
+.menu-item {
+  margin-top: 8px !important;
+  padding: 4px 8px;
+  border-radius: 10px;
+  transition: background 0.15s ease, transform 0.15s ease;
+}
+
+.menu-item:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.menu-item a {
+  font-size: 1rem !important;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+}
+
+.menu-item i {
+  opacity: 0.95;
+}
+
+.active {
+  background-color: rgba(255, 255, 255, 0.98) !important;
+  padding: 10px 12px !important;
+  border-radius: 10px !important;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12);
+}
+
+.active a,
+.active i {
+  color: #0f766e !important;
+}
+
+/* Main panels */
+.header,
+.body {
+  background-color: var(--doc-card) !important;
+  border-radius: var(--doc-radius) !important;
+  box-shadow: var(--doc-shadow) !important;
+  border: 1px solid rgba(148, 163, 184, 0.2) !important;
+}
+
+.header {
+  margin-bottom: 16px !important;
+}
+
+.body {
+  margin-bottom: 16px !important;
+}
+
+.header-content a {
+  color: var(--doc-accent) !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.04em;
+  text-transform: none !important;
+}
+
+.header-content a:hover {
+  text-decoration: underline !important;
+}
+
+.header-content i {
+  color: var(--doc-muted);
+}
+
+/* Auth / registration */
+.form-container {
+  padding: 24px 16px !important;
+}
+
+.registration-form {
+  border: none !important;
+  border-radius: var(--doc-radius) !important;
+  background: var(--doc-card) !important;
+  box-shadow: var(--doc-shadow-lg) !important;
+  max-width: 440px !important;
+  width: 100% !important;
+  padding: 36px 32px !important;
+}
+
+.registration-form h1,
+.registration-form h2,
+.registration-form h3,
+.registration-form h4 {
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  color: var(--doc-text);
+  margin-bottom: 0.75rem;
+}
+
+/* Forms & buttons */
+.form-control,
+.form-select,
+input[type="text"],
+input[type="email"],
+input[type="password"],
+input[type="number"],
+input[type="date"],
+input[type="time"],
+textarea,
+select {
+  border-radius: 10px !important;
+  border: 1px solid #cbd5e1 !important;
+  padding: 0.55rem 0.85rem !important;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.form-control:focus,
+input:focus,
+textarea:focus,
+select:focus {
+  border-color: var(--doc-accent) !important;
+  box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.2) !important;
+  outline: none !important;
+}
+
+.form-btn,
+.btn {
+  border-radius: 10px !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.02em;
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+}
+
+.form-btn:hover,
+.btn:hover {
+  transform: translateY(-1px);
+}
+
+.btn-primary,
+.form-btn.btn-primary {
+  background: linear-gradient(180deg, #14b8a6 0%, #0d9488 100%) !important;
+  border: none !important;
+  box-shadow: 0 4px 14px rgba(13, 148, 136, 0.35);
+}
+
+.btn-primary:hover {
+  filter: brightness(1.05);
+}
+
+/* Tables */
+table {
+  border-collapse: separate;
+  border-spacing: 0;
+  width: 100%;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+}
+
+table thead {
+  background: linear-gradient(180deg, #f1f5f9 0%, #e2e8f0 100%);
+}
+
+table th,
+table td {
+  padding: 12px 14px !important;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+table tr:last-child td {
+  border-bottom: none;
+}
+
+/* Loading overlay */
+.spinner {
+  backdrop-filter: blur(4px);
+  background-color: rgba(15, 23, 42, 0.35) !important;
+}
+
+/* Cards / alerts (Bootstrap) */
+.card {
+  border-radius: var(--doc-radius) !important;
+  border: 1px solid rgba(148, 163, 184, 0.25) !important;
+  box-shadow: var(--doc-shadow) !important;
+}
+
+.alert {
+  border-radius: 12px !important;
+  border: none !important;
+}
+
+/* Badges */
+.badge {
+  font-weight: 600;
+  padding: 0.4em 0.65em;
+  border-radius: 8px;
+}
