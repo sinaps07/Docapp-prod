@@ -33,6 +33,9 @@ const registerController = async (req, res) => {
 
 const loginController = async (req, res) => {
   try {
+    const requestedRole = String(req.body.role || "")
+      .toLowerCase()
+      .trim();
     const user = await userModel.findOne({
       where: { email: req.body.email },
     });
@@ -46,6 +49,20 @@ const loginController = async (req, res) => {
       return res
         .status(200)
         .send({ message: "Invalid email or password.", success: false });
+    }
+    if (requestedRole === "doctor" && !user.isDoctor) {
+      return res.status(200).send({
+        message:
+          "This account is not approved for doctor access yet. Please use the patient login or wait for doctor approval.",
+        success: false,
+      });
+    }
+    if (requestedRole === "patient" && user.isDoctor) {
+      return res.status(200).send({
+        message:
+          "This account is set up as a doctor account. Please continue through the doctor login page.",
+        success: false,
+      });
     }
     const token = jwt.sign({ id: user.id }, process.env.JWT_SECRET, {
       expiresIn: "1d",

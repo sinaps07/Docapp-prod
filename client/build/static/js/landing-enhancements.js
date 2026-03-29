@@ -1,6 +1,9 @@
 (function () {
   var HOME_PATH = "/";
   var LOGIN_PATH = "/login";
+  var REGISTER_PATH = "/register";
+  var DOCTOR_LOGIN_PATH = "/doctor-login";
+  var PATIENT_LOGIN_PATH = "/patient-login";
   var BODY_SELECTOR = ".body";
   var TITLE_SELECTOR = "h1.text-center";
   var GRID_SELECTOR = ".ant-row";
@@ -24,6 +27,31 @@
 
   function isLoginRoute() {
     return window.location.pathname === LOGIN_PATH;
+  }
+
+  function isRegisterRoute() {
+    return window.location.pathname === REGISTER_PATH;
+  }
+
+  function getAuthRoute() {
+    if (window.location.pathname === DOCTOR_LOGIN_PATH) {
+      return "doctor";
+    }
+
+    if (window.location.pathname === PATIENT_LOGIN_PATH) {
+      return "patient";
+    }
+
+    if (isLoginRoute()) {
+      return "selector";
+    }
+
+    return "";
+  }
+
+  function isStandaloneAuthRoute() {
+    var route = getAuthRoute();
+    return route === "doctor" || route === "patient";
   }
 
   function extractDoctorData(card) {
@@ -375,6 +403,10 @@
       subtitle.remove();
     }
 
+    Array.prototype.slice.call(form.querySelectorAll(".login-route-selector, .login-route-helper")).forEach(function (node) {
+      node.remove();
+    });
+
     var actions = form.querySelector(".auth-route-actions");
     if (actions) {
       while (actions.firstChild) {
@@ -387,21 +419,302 @@
       node.classList.remove("auth-route-link");
       node.classList.remove("auth-route-button");
     });
+
+    Array.prototype.slice.call(form.querySelectorAll(".login-route-legacy")).forEach(function (node) {
+      node.classList.remove("login-route-legacy");
+    });
   }
 
-  function createLoginShowcase(container) {
-    var showcase = document.createElement("section");
-    showcase.className = "login-route-showcase";
+  function cleanupStandaloneAuthPage() {
+    var root = document.getElementById("root");
+
+    if (root && root.dataset.authPortal === "true" && !isStandaloneAuthRoute()) {
+      root.innerHTML = "";
+      delete root.dataset.authPortal;
+      delete root.dataset.authPortalMode;
+    }
+
+    document.documentElement.classList.remove("auth-portal-html");
+    if (document.body) {
+      document.body.classList.remove("auth-portal-body");
+    }
+  }
+
+  function renderLoginShowcase(container) {
+    var showcase = container.querySelector(".login-route-showcase");
+
+    if (!showcase) {
+      showcase = document.createElement("section");
+      showcase.className = "login-route-showcase";
+      container.insertBefore(showcase, container.firstChild);
+    }
+
     showcase.innerHTML =
-      '<span class="login-route-kicker">Welcome back</span>' +
-      "<h2>Appointments, doctors, and updates in one calm workspace.</h2>" +
-      "<p>Sign in to continue booking consultations, reviewing schedules, and tracking notifications without extra steps.</p>" +
+      '<span class="login-route-kicker">Smart scheduling</span>' +
+      "<h2>Appointments made easy for doctors and patients.</h2>" +
+      "<p>Manage bookings, track schedules, and stay on top of healthcare updates from one simple appointment platform built for both doctors and users.</p>" +
       '<div class="login-route-points">' +
-      '<div class="login-route-point"><i class="fa-solid fa-stethoscope"></i><span>Browse specialists by expertise and availability.</span></div>' +
-      '<div class="login-route-point"><i class="fa-solid fa-calendar-check"></i><span>Manage bookings and appointments from one dashboard.</span></div>' +
-      '<div class="login-route-point"><i class="fa-solid fa-bell"></i><span>Stay on top of approvals and doctor responses quickly.</span></div>' +
+      '<div class="login-route-point"><i class="fa-solid fa-calendar-check"></i><span>Book, manage, and review appointments without extra steps.</span></div>' +
+      '<div class="login-route-point"><i class="fa-solid fa-user-doctor"></i><span>Doctors and users each get a smoother sign-in path into the app.</span></div>' +
+      '<div class="login-route-point"><i class="fa-solid fa-bell"></i><span>Stay updated with schedules, notifications, and activity in one place.</span></div>' +
       "</div>";
-    container.insertBefore(showcase, container.firstChild);
+  }
+
+  function ensureLoginRouteSelector(form) {
+    var selector = form.querySelector(".login-route-selector");
+
+    if (!selector) {
+      selector = document.createElement("div");
+      selector.className = "login-route-selector";
+      selector.innerHTML =
+        '<div class="login-role-grid">' +
+        '<a class="login-role-card login-role-card--patient" href="' +
+        PATIENT_LOGIN_PATH +
+        '">' +
+        '<span class="login-role-badge">Patient login</span>' +
+        "<strong>Book care, review appointments, and manage your health journey.</strong>" +
+        '<span class="login-role-copy">Continue to the patient portal</span>' +
+        "</a>" +
+        '<a class="login-role-card login-role-card--doctor" href="' +
+        DOCTOR_LOGIN_PATH +
+        '">' +
+        '<span class="login-role-badge">Doctor login</span>' +
+        "<strong>Use your approved doctor account to manage schedules and patients.</strong>" +
+        '<span class="login-role-copy">Continue to the doctor portal</span>' +
+        "</a>" +
+        "</div>" +
+        '<p class="login-route-helper">New here? <a href="/register">Create an account</a>, and if you are a doctor you can apply for doctor access from the dashboard after signing in.</p>';
+
+      var subtitle = form.querySelector(".login-route-subtitle");
+      if (subtitle) {
+        subtitle.insertAdjacentElement("afterend", selector);
+      } else {
+        form.appendChild(selector);
+      }
+    }
+
+    Array.prototype.slice.call(form.querySelectorAll(".ant-form-item, button[type=\"submit\"], a")).forEach(function (node) {
+      if (!node.closest(".login-route-selector")) {
+        node.classList.add("login-route-legacy");
+      }
+    });
+  }
+
+  function getStandaloneAuthContent(route) {
+    if (route === "doctor") {
+      return {
+        shellClass: "auth-portal-shell--doctor",
+        eyebrow: "Doctor portal",
+        title: "Sign in as a doctor",
+        description:
+          "Use your approved doctor account to review appointments, manage your profile, and stay on top of patient activity from one focused workspace.",
+        submitLabel: "Continue to doctor workspace",
+        altHref: PATIENT_LOGIN_PATH,
+        altLabel: "Open patient login",
+        altText: "Not signing in as a doctor?",
+        supportHref: "/login",
+        supportLabel: "Back to portal selection",
+        helperCopy: "Doctor access becomes available after your application has been approved.",
+        note:
+          "If you still need to apply as a doctor, sign in through the patient route first and submit your doctor request from the dashboard.",
+        points:
+          '<div class="auth-portal-point"><i class="fa-solid fa-calendar-check"></i><span>Review appointments and schedule changes quickly.</span></div>' +
+          '<div class="auth-portal-point"><i class="fa-solid fa-file-waveform"></i><span>Keep your doctor profile current and easy for patients to discover.</span></div>' +
+          '<div class="auth-portal-point"><i class="fa-solid fa-user-shield"></i><span>Only approved doctor accounts can continue through this portal.</span></div>',
+      };
+    }
+
+    return {
+      shellClass: "auth-portal-shell--patient",
+      eyebrow: "Patient portal",
+      title: "Sign in as a patient",
+      description:
+        "Access appointment booking, notifications, and doctor discovery from a calmer patient-first sign-in flow built for day-to-day care management.",
+      submitLabel: "Continue to patient workspace",
+      altHref: DOCTOR_LOGIN_PATH,
+      altLabel: "Open doctor login",
+      altText: "Signing in as a doctor instead?",
+      supportHref: "/register",
+      supportLabel: "Create an account",
+      helperCopy: "Create a regular user account to start booking appointments and using the platform.",
+      note:
+        "Use this route for user access, including new people who want to register first and apply for doctor access later from inside the app.",
+      points:
+        '<div class="auth-portal-point"><i class="fa-solid fa-stethoscope"></i><span>Search specialists and compare care options with less friction.</span></div>' +
+        '<div class="auth-portal-point"><i class="fa-solid fa-bell"></i><span>Track appointment updates, notifications, and responses in one place.</span></div>' +
+        '<div class="auth-portal-point"><i class="fa-solid fa-heart-pulse"></i><span>Start as a patient if you plan to apply for doctor access later.</span></div>',
+    };
+  }
+
+  function setStandaloneAuthMessage(form, type, text) {
+    var messageNode = form && form.querySelector(".auth-portal-message");
+    if (!messageNode) {
+      return;
+    }
+
+    messageNode.className = "auth-portal-message" + (type ? " is-" + type : "");
+    messageNode.textContent = text || "";
+  }
+
+  function bindStandaloneAuthForm(form, route) {
+    if (!form || form.dataset.bound === "true") {
+      return;
+    }
+
+    form.dataset.bound = "true";
+    form.addEventListener("submit", function (event) {
+      event.preventDefault();
+
+      var emailInput = form.querySelector('input[name="email"]');
+      var passwordInput = form.querySelector('input[name="password"]');
+      var submitButton = form.querySelector('button[type="submit"]');
+      var originalLabel = submitButton ? submitButton.textContent : "";
+      var payload = {
+        email: normalize(emailInput && emailInput.value),
+        password: passwordInput ? passwordInput.value : "",
+        role: route,
+      };
+
+      if (!payload.email || !payload.password) {
+        setStandaloneAuthMessage(form, "error", "Please enter both your email and password.");
+        return;
+      }
+
+      setStandaloneAuthMessage(form, "", "");
+
+      if (submitButton) {
+        submitButton.disabled = true;
+        submitButton.textContent = "Signing in...";
+      }
+
+      window
+        .fetch("/api/v1/user/login", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(payload),
+        })
+        .then(function (response) {
+          return response.json().catch(function () {
+            return {
+              success: false,
+              message: "We could not understand the login response. Please try again.",
+            };
+          });
+        })
+        .then(function (data) {
+          if (data && data.success && data.token) {
+            window.localStorage.setItem("token", data.token);
+            setStandaloneAuthMessage(form, "success", "Login successful. Opening your dashboard...");
+            window.location.replace("/");
+            return;
+          }
+
+          setStandaloneAuthMessage(
+            form,
+            "error",
+            (data && data.message) || "We could not sign you in right now. Please try again."
+          );
+        })
+        .catch(function () {
+          setStandaloneAuthMessage(form, "error", "Something went wrong while signing in. Please try again.");
+        })
+        .finally(function () {
+          if (submitButton) {
+            submitButton.disabled = false;
+            submitButton.textContent = originalLabel;
+          }
+        });
+    });
+  }
+
+  function enhanceStandaloneAuthPage(route) {
+    var root = document.getElementById("root");
+    var content = getStandaloneAuthContent(route);
+
+    if (!root || !content) {
+      return;
+    }
+
+    if (window.localStorage.getItem("token")) {
+      window.location.replace("/");
+      return;
+    }
+
+    document.documentElement.classList.add("auth-portal-html");
+    if (document.body) {
+      document.body.classList.add("auth-portal-body");
+    }
+
+    if (root.dataset.authPortalMode !== route) {
+      root.innerHTML =
+        '<div class="auth-portal-shell ' +
+        content.shellClass +
+        '">' +
+        '<section class="auth-portal-showcase">' +
+        '<span class="auth-portal-kicker">' +
+        content.eyebrow +
+        "</span>" +
+        "<h1>" +
+        content.title +
+        "</h1>" +
+        "<p>" +
+        content.description +
+        "</p>" +
+        '<div class="auth-portal-points">' +
+        content.points +
+        "</div>" +
+        '<p class="auth-portal-note">' +
+        content.note +
+        "</p>" +
+        "</section>" +
+        '<section class="auth-portal-card">' +
+        '<a class="auth-portal-back" href="' +
+        content.supportHref +
+        '"><i class="fa-solid fa-arrow-left"></i><span>' +
+        content.supportLabel +
+        "</span></a>" +
+        '<span class="auth-portal-card-badge">' +
+        content.eyebrow +
+        "</span>" +
+        "<h2>" +
+        content.title +
+        "</h2>" +
+        '<p class="auth-portal-card-copy">' +
+        content.helperCopy +
+        "</p>" +
+        '<form class="auth-portal-form" novalidate>' +
+        '<label class="auth-portal-field">' +
+        "<span>Email</span>" +
+        '<input type="email" name="email" autocomplete="email" placeholder="you@example.com" required />' +
+        "</label>" +
+        '<label class="auth-portal-field">' +
+        "<span>Password</span>" +
+        '<input type="password" name="password" autocomplete="current-password" placeholder="Enter your password" required />' +
+        "</label>" +
+        '<button class="auth-portal-submit" type="submit">' +
+        content.submitLabel +
+        "</button>" +
+        '<p class="auth-portal-message" aria-live="polite"></p>' +
+        "</form>" +
+        '<div class="auth-portal-links">' +
+        "<span>" +
+        content.altText +
+        "</span>" +
+        '<a href="' +
+        content.altHref +
+        '">' +
+        content.altLabel +
+        "</a>" +
+        "</div>" +
+        "</section>" +
+        "</div>";
+      root.dataset.authPortal = "true";
+      root.dataset.authPortalMode = route;
+    }
+
+    bindStandaloneAuthForm(root.querySelector(".auth-portal-form"), route);
   }
 
   function enhanceLoginPage() {
@@ -422,43 +735,127 @@
 
     container.classList.add("login-route-shell");
 
-    if (!container.querySelector(".login-route-showcase")) {
-      createLoginShowcase(container);
-    }
-
+    renderLoginShowcase(container);
     form.classList.add("login-route-panel");
 
     var heading = form.querySelector("h1, h2, h3, h4");
     if (heading) {
-      heading.textContent = "Sign in";
+      heading.textContent = "Choose your login";
       heading.classList.add("login-route-title");
 
       if (!form.querySelector(".login-route-subtitle")) {
         var subtitle = document.createElement("p");
         subtitle.className = "login-route-subtitle";
-        subtitle.textContent = "Use your email and password to access your doctor booking dashboard.";
+        subtitle.textContent = "Sign in to manage appointments, schedules, and updates across the platform.";
         heading.insertAdjacentElement("afterend", subtitle);
+      } else {
+        form.querySelector(".login-route-subtitle").textContent =
+          "Sign in to manage appointments, schedules, and updates across the platform.";
       }
     }
 
-    var link = form.querySelector('a[href="/register"]');
-    var button = form.querySelector('button[type="submit"]');
+    ensureLoginRouteSelector(form);
+  }
 
-    if (link) {
-      link.classList.add("auth-route-link");
+  function cleanupRegisterPage() {
+    var container = document.querySelector(".form-container");
+
+    if (!container) {
+      return;
     }
 
-    if (button) {
-      button.classList.add("auth-route-button");
+    container.classList.remove("register-route-shell");
+
+    Array.prototype.slice.call(container.querySelectorAll(".register-route-visual")).forEach(function (node) {
+      node.remove();
+    });
+
+    var form = container.querySelector(".registration-form");
+    if (!form) {
+      return;
     }
 
-    if (link && button && !form.querySelector(".auth-route-actions")) {
-      var actions = document.createElement("div");
-      actions.className = "auth-route-actions";
-      link.insertAdjacentElement("beforebegin", actions);
-      actions.appendChild(link);
-      actions.appendChild(button);
+    form.classList.remove("register-route-panel");
+
+    var heading = form.querySelector("h1, h2, h3, h4");
+    if (heading) {
+      heading.classList.remove("register-route-title");
     }
+
+    Array.prototype.slice.call(form.querySelectorAll(".register-route-subtitle")).forEach(function (node) {
+      node.remove();
+    });
+  }
+
+  function renderRegisterShowcase(container) {
+    var showcase = container.querySelector(".register-route-visual");
+
+    if (!showcase) {
+      showcase = document.createElement("section");
+      showcase.className = "register-route-visual";
+      container.insertBefore(showcase, container.firstChild);
+    }
+
+    showcase.innerHTML =
+      '<span class="register-route-kicker">Create account</span>' +
+      "<h2>Start your care journey with a brighter first step.</h2>" +
+      "<p>Create your account to explore doctors, book appointments, and stay connected with your healthcare updates in one reassuring place.</p>" +
+      '<div class="register-route-highlights">' +
+      '<div class="register-route-highlight"><i class="fa-solid fa-hospital"></i><span>Built around a welcoming hospital-inspired atmosphere.</span></div>' +
+      '<div class="register-route-highlight"><i class="fa-solid fa-user-doctor"></i><span>Find specialists and apply for doctor access later if needed.</span></div>' +
+      '<div class="register-route-highlight"><i class="fa-solid fa-heart-circle-check"></i><span>Simple account setup so users can get to care faster.</span></div>' +
+      "</div>";
+  }
+
+  function enhanceRegisterPage() {
+    if (!isRegisterRoute()) {
+      cleanupRegisterPage();
+      return;
+    }
+
+    var container = document.querySelector(".form-container");
+    if (!container) {
+      return;
+    }
+
+    var form = container.querySelector(".registration-form");
+    if (!form) {
+      return;
+    }
+
+    container.classList.add("register-route-shell");
+    renderRegisterShowcase(container);
+    form.classList.add("register-route-panel");
+
+    var heading = form.querySelector("h1, h2, h3, h4");
+    if (heading) {
+      heading.textContent = "Create your account";
+      heading.classList.add("register-route-title");
+
+      if (!form.querySelector(".register-route-subtitle")) {
+        var subtitle = document.createElement("p");
+        subtitle.className = "register-route-subtitle";
+        subtitle.textContent =
+          "Join the platform to book consultations, manage appointments, and access a calm healthcare workspace.";
+        heading.insertAdjacentElement("afterend", subtitle);
+      } else {
+        form.querySelector(".register-route-subtitle").textContent =
+          "Join the platform to book consultations, manage appointments, and access a calm healthcare workspace.";
+      }
+    }
+  }
+
+  function enhanceAuthRoutes() {
+    if (isStandaloneAuthRoute()) {
+      cleanupLoginPage();
+      cleanupRegisterPage();
+      enhanceStandaloneAuthPage(getAuthRoute());
+      return;
+    }
+
+    cleanupStandaloneAuthPage();
+    enhanceLoginPage();
+    enhanceRegisterPage();
   }
 
   function enhanceHomePage() {
@@ -521,7 +918,7 @@
     window.clearTimeout(applyTimer);
     applyTimer = window.setTimeout(function () {
       enhanceHomePage();
-      enhanceLoginPage();
+      enhanceAuthRoutes();
     }, 60);
   }
 
