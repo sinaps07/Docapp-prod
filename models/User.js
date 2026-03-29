@@ -32,6 +32,12 @@ module.exports = (sequelize) => {
         defaultValue: false,
         field: "is_doctor",
       },
+      accountType: {
+        type: DataTypes.STRING,
+        allowNull: false,
+        defaultValue: "patient",
+        field: "account_type",
+      },
       notification: {
         type: DataTypes.JSONB,
         defaultValue: [],

@@ -2,13 +2,102 @@
   var HOME_PATH = "/";
   var LOGIN_PATH = "/login";
   var REGISTER_PATH = "/register";
+  var PATIENT_REGISTER_PATH = "/patient-register";
+  var DOCTOR_REGISTER_PATH = "/doctor-register";
   var DOCTOR_LOGIN_PATH = "/doctor-login";
   var PATIENT_LOGIN_PATH = "/patient-login";
   var BODY_SELECTOR = ".body";
   var TITLE_SELECTOR = "h1.text-center";
   var GRID_SELECTOR = ".ant-row";
+  var ACCOUNT_TYPE_STORAGE_KEY = "docappAccountType";
   var applyTimer = null;
   var routeTimer = null;
+  var accountTypeRequest = null;
+
+  function hasAuthToken() {
+    return Boolean(window.localStorage.getItem("token"));
+  }
+
+  function getStoredAccountType() {
+    return normalize(window.localStorage.getItem(ACCOUNT_TYPE_STORAGE_KEY)).toLowerCase();
+  }
+
+  function setStoredAccountType(accountType) {
+    var normalizedAccountType = normalize(accountType).toLowerCase();
+
+    if (!normalizedAccountType) {
+      window.localStorage.removeItem(ACCOUNT_TYPE_STORAGE_KEY);
+      return;
+    }
+
+    window.localStorage.setItem(ACCOUNT_TYPE_STORAGE_KEY, normalizedAccountType);
+  }
+
+  function syncAuthenticatedAccountType(callback) {
+    var token = window.localStorage.getItem("token");
+    var storedAccountType = getStoredAccountType();
+
+    if (!token) {
+      setStoredAccountType("");
+      accountTypeRequest = null;
+      if (typeof callback === "function") {
+        callback("");
+      }
+      return;
+    }
+
+    if (storedAccountType) {
+      if (typeof callback === "function") {
+        callback(storedAccountType);
+      }
+      return;
+    }
+
+    if (!accountTypeRequest) {
+      accountTypeRequest = window
+        .fetch("/api/v1/user/getUserData", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: "Bearer " + token,
+          },
+          body: JSON.stringify({}),
+        })
+        .then(function (response) {
+          return response.json().catch(function () {
+            return {
+              success: false,
+            };
+          });
+        })
+        .then(function (data) {
+          var accountType =
+            data && data.success && data.data ? normalize(data.data.accountType).toLowerCase() : "";
+
+          setStoredAccountType(accountType);
+          return accountType;
+        })
+        .catch(function () {
+          setStoredAccountType("");
+          return "";
+        });
+
+      accountTypeRequest.then(
+        function () {
+          accountTypeRequest = null;
+        },
+        function () {
+          accountTypeRequest = null;
+        }
+      );
+    }
+
+    accountTypeRequest.then(function (accountType) {
+      if (typeof callback === "function") {
+        callback(accountType);
+      }
+    });
+  }
 
   function normalize(value) {
     return String(value || "")
@@ -33,8 +122,33 @@
     return window.location.pathname === REGISTER_PATH;
   }
 
+  function getRegisterRoute() {
+    if (window.location.pathname === PATIENT_REGISTER_PATH) {
+      return "patient";
+    }
+
+    if (window.location.pathname === DOCTOR_REGISTER_PATH) {
+      return "doctor";
+    }
+
+    if (isRegisterRoute()) {
+      return "selector";
+    }
+
+    return "";
+  }
+
+  function isStandaloneRegisterRoute() {
+    var route = getRegisterRoute();
+    return route === "patient" || route === "doctor";
+  }
+
   function isDoctorProfileRoute() {
     return /^\/doctor\/profile\/[^/]+$/.test(window.location.pathname);
+  }
+
+  function isApplyDoctorRoute() {
+    return window.location.pathname === "/apply-doctor";
   }
 
   function getAuthRoute() {
@@ -610,6 +724,7 @@
         .then(function (data) {
           if (data && data.success && data.token) {
             window.localStorage.setItem("token", data.token);
+            setStoredAccountType(route);
             setStandaloneAuthMessage(form, "success", "Login successful. Opening your dashboard...");
             window.location.replace("/");
             return;
@@ -786,8 +901,14 @@
       heading.classList.remove("register-route-title");
     }
 
-    Array.prototype.slice.call(form.querySelectorAll(".register-route-subtitle")).forEach(function (node) {
+    Array.prototype.slice.call(
+      form.querySelectorAll(".register-route-subtitle, .register-route-selector, .register-route-helper")
+    ).forEach(function (node) {
       node.remove();
+    });
+
+    Array.prototype.slice.call(form.querySelectorAll(".register-route-legacy")).forEach(function (node) {
+      node.classList.remove("register-route-legacy");
     });
   }
 
@@ -801,14 +922,54 @@
     }
 
     showcase.innerHTML =
-      '<span class="register-route-kicker">Create account</span>' +
-      "<h2>Start your care journey with a brighter first step.</h2>" +
-      "<p>Create your account to explore doctors, book appointments, and stay connected with your healthcare updates in one reassuring place.</p>" +
+      '<span class="register-route-kicker">docApp</span>' +
+      "<h2>Choose the right registration path.</h2>" +
+      "<p>Create a regular patient account for booking and appointments, or register directly as a doctor to submit your professional profile for approval.</p>" +
       '<div class="register-route-highlights">' +
-      '<div class="register-route-highlight"><i class="fa-solid fa-hospital"></i><span>Built around a welcoming hospital-inspired atmosphere.</span></div>' +
-      '<div class="register-route-highlight"><i class="fa-solid fa-user-doctor"></i><span>Find specialists and apply for doctor access later if needed.</span></div>' +
-      '<div class="register-route-highlight"><i class="fa-solid fa-heart-circle-check"></i><span>Simple account setup so users can get to care faster.</span></div>' +
+      '<div class="register-route-highlight"><i class="fa-solid fa-user"></i><span>Patient accounts are built for booking consultations and managing appointments.</span></div>' +
+      '<div class="register-route-highlight"><i class="fa-solid fa-user-doctor"></i><span>Doctor registration goes straight into the approval flow with your clinic details.</span></div>' +
+      '<div class="register-route-highlight"><i class="fa-solid fa-heart-circle-check"></i><span>Each route keeps the account setup focused from the start.</span></div>' +
       "</div>";
+  }
+
+  function ensureRegisterRouteSelector(form) {
+    var selector = form.querySelector(".register-route-selector");
+
+    if (!selector) {
+      selector = document.createElement("div");
+      selector.className = "register-route-selector";
+      selector.innerHTML =
+        '<div class="register-choice-grid">' +
+        '<a class="register-choice-card register-choice-card--patient" href="' +
+        PATIENT_REGISTER_PATH +
+        '">' +
+        '<span class="register-choice-badge">Patient register</span>' +
+        "<strong>Create a regular user account for appointments, updates, and doctor discovery.</strong>" +
+        '<span class="register-choice-copy">Continue as patient</span>' +
+        "</a>" +
+        '<a class="register-choice-card register-choice-card--doctor" href="' +
+        DOCTOR_REGISTER_PATH +
+        '">' +
+        '<span class="register-choice-badge">Doctor register</span>' +
+        "<strong>Register directly as a doctor and send your profile for admin approval.</strong>" +
+        '<span class="register-choice-copy">Continue as doctor</span>' +
+        "</a>" +
+        "</div>" +
+        '<p class="register-route-helper">Already have an account? <a href="/login">Sign in here</a>.</p>';
+
+      var subtitle = form.querySelector(".register-route-subtitle");
+      if (subtitle) {
+        subtitle.insertAdjacentElement("afterend", selector);
+      } else {
+        form.appendChild(selector);
+      }
+    }
+
+    Array.prototype.slice.call(form.querySelectorAll(".ant-form-item, button[type=\"submit\"], a")).forEach(function (node) {
+      if (!node.closest(".register-route-selector")) {
+        node.classList.add("register-route-legacy");
+      }
+    });
   }
 
   function enhanceRegisterPage() {
@@ -833,33 +994,315 @@
 
     var heading = form.querySelector("h1, h2, h3, h4");
     if (heading) {
-      heading.textContent = "Create your account";
+      heading.textContent = "Choose your registration";
       heading.classList.add("register-route-title");
 
       if (!form.querySelector(".register-route-subtitle")) {
         var subtitle = document.createElement("p");
         subtitle.className = "register-route-subtitle";
         subtitle.textContent =
-          "Join the platform to book consultations, manage appointments, and access a calm healthcare workspace.";
+          "Select whether you want to register as a patient or as a doctor.";
         heading.insertAdjacentElement("afterend", subtitle);
       } else {
         form.querySelector(".register-route-subtitle").textContent =
-          "Join the platform to book consultations, manage appointments, and access a calm healthcare workspace.";
+          "Select whether you want to register as a patient or as a doctor.";
       }
     }
+
+    ensureRegisterRouteSelector(form);
+  }
+
+  function cleanupStandaloneRegisterPage() {
+    var root = document.getElementById("root");
+
+    if (root && root.dataset.registerPortal === "true" && !isStandaloneRegisterRoute()) {
+      root.innerHTML = "";
+      delete root.dataset.registerPortal;
+      delete root.dataset.registerPortalMode;
+    }
+  }
+
+  function getStandaloneRegisterContent(route) {
+    if (route === "doctor") {
+      return {
+        shellClass: "register-portal-shell--doctor",
+        eyebrow: "Doctor registration",
+        title: "Register as a doctor",
+        description:
+          "Submit your doctor profile directly with clinic details, availability, and professional information so the admin team can review your account.",
+        submitLabel: "Submit doctor registration",
+        redirectHref: "/login",
+        redirectLabel: "Back to login",
+        altHref: PATIENT_REGISTER_PATH,
+        altLabel: "Patient registration",
+        successMessage:
+          "Doctor registration submitted successfully. Please wait for admin approval before using doctor login.",
+      };
+    }
+
+    return {
+      shellClass: "register-portal-shell--patient",
+      eyebrow: "Patient registration",
+      title: "Create a patient account",
+      description:
+        "Create a regular user account to book appointments, explore doctors, and manage updates from one simple healthcare workspace.",
+      submitLabel: "Create account",
+      redirectHref: "/login",
+      redirectLabel: "Back to login",
+      altHref: DOCTOR_REGISTER_PATH,
+      altLabel: "Doctor registration",
+      successMessage: "Account created successfully. You can sign in now.",
+    };
+  }
+
+  function setStandaloneRegisterMessage(form, type, text) {
+    var messageNode = form && form.querySelector(".register-portal-message");
+    if (!messageNode) {
+      return;
+    }
+
+    messageNode.className = "register-portal-message" + (type ? " is-" + type : "");
+    messageNode.textContent = text || "";
+  }
+
+  function bindStandaloneRegisterForm(form, route) {
+    if (!form || form.dataset.bound === "true") {
+      return;
+    }
+
+    form.dataset.bound = "true";
+    form.addEventListener("submit", function (event) {
+      event.preventDefault();
+
+      var submitButton = form.querySelector('button[type="submit"]');
+      var originalLabel = submitButton ? submitButton.textContent : "";
+      var payload = {
+        accountType: route,
+      };
+
+      Array.prototype.slice.call(form.querySelectorAll("[name]")).forEach(function (field) {
+        if (field.type === "time") {
+          return;
+        }
+
+        payload[field.name] = normalize(field.value);
+      });
+
+      if (route === "doctor") {
+        payload.name = normalize([payload.firstName, payload.lastName].join(" "));
+        payload.timings = [
+          normalize(form.querySelector('input[name="timingStart"]') && form.querySelector('input[name="timingStart"]').value),
+          normalize(form.querySelector('input[name="timingEnd"]') && form.querySelector('input[name="timingEnd"]').value),
+        ];
+      }
+
+      if (!payload.email || !payload.password || (!payload.name && route === "patient")) {
+        setStandaloneRegisterMessage(form, "error", "Please complete all required registration fields.");
+        return;
+      }
+
+      setStandaloneRegisterMessage(form, "", "");
+
+      if (submitButton) {
+        submitButton.disabled = true;
+        submitButton.textContent = route === "doctor" ? "Submitting..." : "Creating...";
+      }
+
+      window
+        .fetch("/api/v1/user/register", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(payload),
+        })
+        .then(function (response) {
+          return response.json().catch(function () {
+            return {
+              success: false,
+              message: "We could not understand the registration response.",
+            };
+          });
+        })
+        .then(function (data) {
+          if (data && data.success) {
+            setStandaloneRegisterMessage(
+              form,
+              "success",
+              data.message || (route === "doctor"
+                ? "Doctor registration submitted successfully."
+                : "Account created successfully.")
+            );
+            window.setTimeout(function () {
+              window.location.replace("/login");
+            }, 900);
+            return;
+          }
+
+          setStandaloneRegisterMessage(
+            form,
+            "error",
+            (data && data.message) || "Unable to complete the registration right now."
+          );
+        })
+        .catch(function () {
+          setStandaloneRegisterMessage(form, "error", "Something went wrong while creating the account.");
+        })
+        .finally(function () {
+          if (submitButton) {
+            submitButton.disabled = false;
+            submitButton.textContent = originalLabel;
+          }
+        });
+    });
+  }
+
+  function enhanceStandaloneRegisterPage(route) {
+    var root = document.getElementById("root");
+    var content = getStandaloneRegisterContent(route);
+
+    if (!root || !content) {
+      return;
+    }
+
+    if (window.localStorage.getItem("token")) {
+      window.location.replace("/");
+      return;
+    }
+
+    if (root.dataset.registerPortalMode !== route) {
+      root.innerHTML =
+        '<div class="register-portal-shell ' +
+        content.shellClass +
+        '">' +
+        '<section class="register-portal-showcase">' +
+        '<span class="register-portal-kicker">' +
+        content.eyebrow +
+        "</span>" +
+        "<h1>" +
+        content.title +
+        "</h1>" +
+        "<p>" +
+        content.description +
+        "</p>" +
+        '<div class="register-portal-points">' +
+        (route === "doctor"
+          ? '<div class="register-portal-point"><i class="fa-solid fa-user-doctor"></i><span>Doctor registration includes your clinic profile and timings.</span></div>' +
+            '<div class="register-portal-point"><i class="fa-solid fa-shield-heart"></i><span>Your doctor account stays pending until the admin approves it.</span></div>' +
+            '<div class="register-portal-point"><i class="fa-solid fa-notes-medical"></i><span>Use this route instead of Apply Doctor.</span></div>'
+          : '<div class="register-portal-point"><i class="fa-solid fa-calendar-check"></i><span>Create a regular account for appointment booking and updates.</span></div>' +
+            '<div class="register-portal-point"><i class="fa-solid fa-hospital-user"></i><span>Patient accounts stay focused on booking and care management.</span></div>' +
+            '<div class="register-portal-point"><i class="fa-solid fa-circle-info"></i><span>Patient accounts cannot later switch through Apply Doctor.</span></div>') +
+        "</div>" +
+        "</section>" +
+        '<section class="register-portal-card">' +
+        '<a class="register-portal-back" href="' +
+        content.redirectHref +
+        '"><i class="fa-solid fa-arrow-left"></i><span>' +
+        content.redirectLabel +
+        "</span></a>" +
+        '<span class="register-portal-card-badge">' +
+        content.eyebrow +
+        "</span>" +
+        "<h2>" +
+        content.title +
+        "</h2>" +
+        '<form class="register-portal-form" novalidate>' +
+        (route === "doctor"
+          ? '<div class="register-portal-grid">' +
+            '<label class="register-portal-field"><span>First name</span><input type="text" name="firstName" required /></label>' +
+            '<label class="register-portal-field"><span>Last name</span><input type="text" name="lastName" required /></label>' +
+            '<label class="register-portal-field"><span>Email</span><input type="email" name="email" required /></label>' +
+            '<label class="register-portal-field"><span>Password</span><input type="password" name="password" required /></label>' +
+            '<label class="register-portal-field"><span>Phone</span><input type="text" name="phone" required /></label>' +
+            '<label class="register-portal-field"><span>Website</span><input type="text" name="website" /></label>' +
+            '<label class="register-portal-field register-portal-field--full"><span>Address</span><input type="text" name="address" required /></label>' +
+            '<label class="register-portal-field"><span>Specialization</span><input type="text" name="specialization" required /></label>' +
+            '<label class="register-portal-field"><span>Experience</span><input type="text" name="experience" required /></label>' +
+            '<label class="register-portal-field"><span>Fees</span><input type="number" name="feesPerCunsaltation" required /></label>' +
+            '<label class="register-portal-field"><span>Start time</span><input type="time" name="timingStart" required /></label>' +
+            '<label class="register-portal-field"><span>End time</span><input type="time" name="timingEnd" required /></label>' +
+            "</div>"
+          : '<label class="register-portal-field"><span>Name</span><input type="text" name="name" required /></label>' +
+            '<label class="register-portal-field"><span>Email</span><input type="email" name="email" required /></label>' +
+            '<label class="register-portal-field"><span>Password</span><input type="password" name="password" required /></label>') +
+        '<button class="register-portal-submit" type="submit">' +
+        content.submitLabel +
+        "</button>" +
+        '<p class="register-portal-message" aria-live="polite"></p>' +
+        "</form>" +
+        '<div class="register-portal-links"><span>Need the other route?</span><a href="' +
+        content.altHref +
+        '">' +
+        content.altLabel +
+        "</a></div>" +
+        "</section>" +
+        "</div>";
+      root.dataset.registerPortal = "true";
+      root.dataset.registerPortalMode = route;
+    }
+
+    bindStandaloneRegisterForm(root.querySelector(".register-portal-form"), route);
   }
 
   function enhanceAuthRoutes() {
     if (isStandaloneAuthRoute()) {
       cleanupLoginPage();
       cleanupRegisterPage();
+      cleanupStandaloneRegisterPage();
       enhanceStandaloneAuthPage(getAuthRoute());
       return;
     }
 
+    if (isStandaloneRegisterRoute()) {
+      cleanupLoginPage();
+      cleanupRegisterPage();
+      cleanupStandaloneAuthPage();
+      enhanceStandaloneRegisterPage(getRegisterRoute());
+      return;
+    }
+
     cleanupStandaloneAuthPage();
+    cleanupStandaloneRegisterPage();
     enhanceLoginPage();
     enhanceRegisterPage();
+  }
+
+  function enhanceDoctorRegistrationPolicy() {
+    function removeApplyDoctorMenuItem() {
+      Array.prototype.slice.call(document.querySelectorAll('.menu a[href="/apply-doctor"]')).forEach(function (link) {
+        var menuItem = link.closest(".menu-item");
+        if (menuItem) {
+          menuItem.remove();
+        }
+      });
+    }
+
+    if (!hasAuthToken()) {
+      setStoredAccountType("");
+      return;
+    }
+
+    if (getStoredAccountType() === "patient") {
+      removeApplyDoctorMenuItem();
+
+      if (isApplyDoctorRoute()) {
+        window.location.replace("/");
+      }
+      return;
+    }
+
+    syncAuthenticatedAccountType(function (accountType) {
+      if (accountType !== "patient") {
+        return;
+      }
+
+      removeApplyDoctorMenuItem();
+
+      if (isApplyDoctorRoute()) {
+        window.location.replace("/");
+      }
+    });
   }
 
   function setDoctorProfileStatus(form, type, text) {
@@ -1075,6 +1518,7 @@
     applyTimer = window.setTimeout(function () {
       enhanceHomePage();
       enhanceAuthRoutes();
+      enhanceDoctorRegistrationPolicy();
       enhanceDoctorProfilePage();
     }, 60);
   }

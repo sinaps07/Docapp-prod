@@ -13,6 +13,19 @@ const connectDB = async () => {
   try {
     await sequelize.authenticate();
     await sequelize.sync();
+    await sequelize.query(`
+      ALTER TABLE users
+      ADD COLUMN IF NOT EXISTS account_type VARCHAR(20) NOT NULL DEFAULT 'patient';
+    `);
+    await sequelize.query(`
+      UPDATE users
+      SET account_type = CASE
+        WHEN is_admin = true THEN 'admin'
+        WHEN is_doctor = true THEN 'doctor'
+        ELSE COALESCE(account_type, 'patient')
+      END
+      WHERE account_type IS NULL OR account_type = '';
+    `);
     const adminCount = await User.count({ where: { isAdmin: true } });
     if (adminCount === 0 && process.env.ADMIN_EMAIL && process.env.ADMIN_PASSWORD) {
       const bcrypt = require("bcryptjs");
@@ -24,6 +37,7 @@ const connectDB = async () => {
         password: hashedPassword,
         isAdmin: true,
         isDoctor: false,
+        accountType: "admin",
         notification: [],
         seennotification: [],
       });

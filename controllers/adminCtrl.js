@@ -56,6 +56,9 @@ const changeAccountStatusController = async (req, res) => {
       onClickPath: "/notification",
     });
     user.isDoctor = status === "approved";
+    if (status === "approved") {
+      user.accountType = "doctor";
+    }
     user.notification = notification;
     await user.save();
     res.status(201).send({

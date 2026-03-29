@@ -7,8 +7,35 @@ const moment = require("moment");
 const { Op } = require("sequelize");
 const { normalizeTimings, areValidTimings } = require("../utils/timings");
 
+const notifyAdminAboutDoctorRequest = async (doctorRecord) => {
+  const adminUser = await userModel.findOne({ where: { isAdmin: true } });
+  if (!adminUser) {
+    throw new Error(
+      "No admin user is configured. You cannot submit a doctor registration yet."
+    );
+  }
+
+  const notification = [...(adminUser.notification || [])];
+  notification.push({
+    type: "apply-doctor-request",
+    message: `${doctorRecord.firstName} ${doctorRecord.lastName} has applied for a doctor account.`,
+    data: {
+      doctorId: doctorRecord.id,
+      name: doctorRecord.firstName + " " + doctorRecord.lastName,
+      onClickPath: "/admin/docotrs",
+    },
+  });
+
+  await adminUser.update({ notification });
+};
+
 const registerController = async (req, res) => {
   try {
+    const requestedAccountType = String(req.body.accountType || "patient")
+      .toLowerCase()
+      .trim();
+    const accountType =
+      requestedAccountType === "doctor" ? "doctor" : "patient";
     const existingUser = await userModel.findOne({
       where: { email: req.body.email },
     });
@@ -17,11 +44,81 @@ const registerController = async (req, res) => {
         .status(200)
         .send({ message: "User already exists.", success: false });
     }
+
+    if (accountType === "doctor") {
+      const normalizedTimings = normalizeTimings(req.body.timings);
+
+      if (!req.body.firstName || !req.body.lastName || !req.body.phone) {
+        return res.status(200).send({
+          success: false,
+          message: "Doctor registration requires first name, last name, and phone number.",
+        });
+      }
+
+      if (
+        !req.body.address ||
+        !req.body.specialization ||
+        !req.body.experience ||
+        !req.body.feesPerCunsaltation
+      ) {
+        return res.status(200).send({
+          success: false,
+          message: "Please complete all professional doctor registration details.",
+        });
+      }
+
+      if (!areValidTimings(normalizedTimings)) {
+        return res.status(200).send({
+          success: false,
+          message: "Please select a valid doctor availability time range.",
+        });
+      }
+
+      req.body.timings = normalizedTimings;
+    }
+
     const password = req.body.password;
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
-    req.body.password = hashedPassword;
-    await userModel.create(req.body);
+
+    const newUser = await userModel.create({
+      name:
+        req.body.name ||
+        [req.body.firstName, req.body.lastName].filter(Boolean).join(" "),
+      email: req.body.email,
+      password: hashedPassword,
+      isAdmin: false,
+      isDoctor: false,
+      accountType,
+      notification: [],
+      seennotification: [],
+    });
+
+    if (accountType === "doctor") {
+      const newDoctor = await doctorModel.create({
+        userId: newUser.id,
+        firstName: req.body.firstName,
+        lastName: req.body.lastName,
+        phone: req.body.phone,
+        email: req.body.email,
+        website: req.body.website,
+        address: req.body.address,
+        specialization: req.body.specialization,
+        experience: req.body.experience,
+        feesPerCunsaltation: req.body.feesPerCunsaltation,
+        status: "pending",
+        timings: req.body.timings,
+      });
+
+      await notifyAdminAboutDoctorRequest(newDoctor);
+
+      return res.status(201).send({
+        message:
+          "Doctor registration submitted successfully. Your account will be available after admin approval.",
+        success: true,
+      });
+    }
+
     res.status(201).send({ message: "Registered successfully.", success: true });
   } catch (error) {
     console.log(error);
@@ -51,6 +148,13 @@ const loginController = async (req, res) => {
         .status(200)
         .send({ message: "Invalid email or password.", success: false });
     }
+    if (requestedRole === "doctor" && user.accountType !== "doctor") {
+      return res.status(200).send({
+        message:
+          "This account is registered as a patient account. Please continue through the patient login page.",
+        success: false,
+      });
+    }
     if (requestedRole === "doctor" && !user.isDoctor) {
       return res.status(200).send({
         message:
@@ -58,7 +162,7 @@ const loginController = async (req, res) => {
         success: false,
       });
     }
-    if (requestedRole === "patient" && user.isDoctor) {
+    if (requestedRole === "patient" && user.accountType === "doctor") {
       return res.status(200).send({
         message:
           "This account is set up as a doctor account. Please continue through the doctor login page.",
@@ -102,43 +206,20 @@ const authController = async (req, res) => {
 
 const applyDoctorController = async (req, res) => {
   try {
-    const normalizedTimings = normalizeTimings(req.body.timings);
-
-    if (!areValidTimings(normalizedTimings)) {
+    const user = await userModel.findByPk(req.body.userId);
+    if (!user) {
       return res.status(200).send({
         success: false,
-        message: "Please select a valid doctor availability time range.",
+        message: "User not found.",
       });
     }
 
-    const newDoctor = await doctorModel.create({
-      ...req.body,
-      userId: req.body.userId,
-      status: "pending",
-      timings: normalizedTimings,
-    });
-    const adminUser = await userModel.findOne({ where: { isAdmin: true } });
-    if (!adminUser) {
-      return res.status(500).send({
-        success: false,
-        message:
-          "No admin user is configured. You cannot submit a doctor application yet.",
-      });
-    }
-    const notification = [...(adminUser.notification || [])];
-    notification.push({
-      type: "apply-doctor-request",
-      message: `${newDoctor.firstName} ${newDoctor.lastName} has applied for a doctor account.`,
-      data: {
-        doctorId: newDoctor.id,
-        name: newDoctor.firstName + " " + newDoctor.lastName,
-        onClickPath: "/admin/docotrs",
-      },
-    });
-    await adminUser.update({ notification });
-    res.status(201).send({
-      success: true,
-      message: "Doctor application submitted successfully.",
+    return res.status(200).send({
+      success: false,
+      message:
+        user.accountType === "patient"
+          ? "Patient accounts cannot use Apply Doctor anymore. Please use the dedicated doctor registration route."
+          : "Doctor access now uses the dedicated doctor registration route.",
     });
   } catch (error) {
     console.log(error);
