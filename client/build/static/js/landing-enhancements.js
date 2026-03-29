@@ -33,6 +33,10 @@
     return window.location.pathname === REGISTER_PATH;
   }
 
+  function isDoctorProfileRoute() {
+    return /^\/doctor\/profile\/[^/]+$/.test(window.location.pathname);
+  }
+
   function getAuthRoute() {
     if (window.location.pathname === DOCTOR_LOGIN_PATH) {
       return "doctor";
@@ -858,6 +862,158 @@
     enhanceRegisterPage();
   }
 
+  function setDoctorProfileStatus(form, type, text) {
+    var status = form && form.querySelector(".doctor-profile-status");
+
+    if (!status) {
+      status = document.createElement("p");
+      status.className = "doctor-profile-status";
+      form.appendChild(status);
+    }
+
+    status.className = "doctor-profile-status" + (type ? " is-" + type : "");
+    status.textContent = text || "";
+  }
+
+  function collectDoctorProfilePayload(form) {
+    var payload = {
+      userId: window.location.pathname.split("/").pop(),
+    };
+
+    Array.prototype.slice.call(form.querySelectorAll(".ant-form-item")).forEach(function (item) {
+      var label = normalize(item.querySelector(".ant-form-item-label label") && item.querySelector(".ant-form-item-label label").textContent)
+        .replace(/\s*:\s*$/, "")
+        .toLowerCase();
+
+      if (!label) {
+        return;
+      }
+
+      if (label === "timings") {
+        var timeInputs = Array.prototype.slice.call(item.querySelectorAll("input"))
+          .map(function (input) {
+            return normalize(input.value);
+          })
+          .filter(Boolean);
+
+        payload.timings = timeInputs.slice(0, 2);
+        return;
+      }
+
+      var field = item.querySelector("input, textarea, select");
+      if (!field) {
+        return;
+      }
+
+      var value = normalize(field.value);
+
+      if (label === "first name") {
+        payload.firstName = value;
+      } else if (label === "last name") {
+        payload.lastName = value;
+      } else if (label === "phone no") {
+        payload.phone = value;
+      } else if (label === "email") {
+        payload.email = value;
+      } else if (label === "website") {
+        payload.website = value;
+      } else if (label === "address") {
+        payload.address = value;
+      } else if (label === "specialization") {
+        payload.specialization = value;
+      } else if (label === "experience") {
+        payload.experience = value;
+      } else if (label === "fees per cunsaltation" || label === "fees per consultation") {
+        payload.feesPerCunsaltation = value;
+      }
+    });
+
+    return payload;
+  }
+
+  function enhanceDoctorProfilePage() {
+    if (!isDoctorProfileRoute()) {
+      return;
+    }
+
+    var form = document.querySelector(".body form");
+    if (!form || form.dataset.profileTimingFixBound === "true") {
+      return;
+    }
+
+    var submitButton = form.querySelector('button[type="submit"]');
+    if (!submitButton) {
+      return;
+    }
+
+    form.dataset.profileTimingFixBound = "true";
+
+    form.addEventListener(
+      "submit",
+      function (event) {
+        event.preventDefault();
+        event.stopPropagation();
+        if (typeof event.stopImmediatePropagation === "function") {
+          event.stopImmediatePropagation();
+        }
+
+        var payload = collectDoctorProfilePayload(form);
+        var token = window.localStorage.getItem("token");
+        var originalLabel = submitButton.textContent;
+
+        if (!payload.timings || payload.timings.length !== 2) {
+          setDoctorProfileStatus(form, "error", "Please choose both start and end timings.");
+          return;
+        }
+
+        setDoctorProfileStatus(form, "", "");
+        submitButton.disabled = true;
+        submitButton.textContent = "Updating...";
+
+        window
+          .fetch("/api/v1/doctor/updateProfile", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: "Bearer " + token,
+            },
+            body: JSON.stringify(payload),
+          })
+          .then(function (response) {
+            return response.json().catch(function () {
+              return {
+                success: false,
+                message: "We could not process the doctor profile update.",
+              };
+            });
+          })
+          .then(function (data) {
+            if (data && data.success) {
+              setDoctorProfileStatus(form, "success", data.message || "Doctor profile updated successfully.");
+              window.setTimeout(function () {
+                window.location.replace("/");
+              }, 500);
+              return;
+            }
+
+            setDoctorProfileStatus(
+              form,
+              "error",
+              (data && data.message) || "Unable to update the doctor profile right now."
+            );
+          })
+          .catch(function () {
+            setDoctorProfileStatus(form, "error", "Something went wrong while updating the profile.");
+          })
+          .finally(function () {
+            submitButton.disabled = false;
+            submitButton.textContent = originalLabel;
+          });
+      },
+      true
+    );
+  }
+
   function enhanceHomePage() {
     if (!isHomeRoute()) {
       cleanup();
@@ -919,6 +1075,7 @@
     applyTimer = window.setTimeout(function () {
       enhanceHomePage();
       enhanceAuthRoutes();
+      enhanceDoctorProfilePage();
     }, 60);
   }
 

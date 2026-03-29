@@ -1243,6 +1243,19 @@ table tr:last-child td {
   text-decoration: underline;
 }
 
+.doctor-profile-status {
+  margin: 12px 0 0;
+  font-weight: 700;
+}
+
+.doctor-profile-status.is-error {
+  color: #b91c1c;
+}
+
+.doctor-profile-status.is-success {
+  color: #0f766e;
+}
+
 @media (max-width: 900px) {
   .register-route-shell {
     grid-template-columns: 1fr;

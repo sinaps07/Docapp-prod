@@ -5,6 +5,7 @@ const doctorModel = require("../models/doctorModel");
 const appointmentModel = require("../models/appointmentModel");
 const moment = require("moment");
 const { Op } = require("sequelize");
+const { normalizeTimings, areValidTimings } = require("../utils/timings");
 
 const registerController = async (req, res) => {
   try {
@@ -101,10 +102,20 @@ const authController = async (req, res) => {
 
 const applyDoctorController = async (req, res) => {
   try {
+    const normalizedTimings = normalizeTimings(req.body.timings);
+
+    if (!areValidTimings(normalizedTimings)) {
+      return res.status(200).send({
+        success: false,
+        message: "Please select a valid doctor availability time range.",
+      });
+    }
+
     const newDoctor = await doctorModel.create({
       ...req.body,
       userId: req.body.userId,
       status: "pending",
+      timings: normalizedTimings,
     });
     const adminUser = await userModel.findOne({ where: { isAdmin: true } });
     if (!adminUser) {
